@@ -1,0 +1,4 @@
+# Auto Configure
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.zcloud.alone.network.server.IotServeBootstrap,\
+com.zcloud.alone.IotAutoConfiguration
