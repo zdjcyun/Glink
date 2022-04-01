@@ -2,7 +2,7 @@ package com.zcloud.alone.network.component.youren;
 
 import com.zcloud.alone.conf.ConnectProperties;
 import com.zcloud.alone.network.annotation.NettyHandler;
-import com.zcloud.alone.network.handler.LoginHeartHandler;
+import com.zcloud.alone.network.handler.DtuLoginHeartHandler;
 import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
 
@@ -11,9 +11,10 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @NettyHandler(nettyServer = {"youren"},order = 1)
-public class YouRenLoginHeartHandler extends LoginHeartHandler {
+public class YouRenLoginHeartHandler extends DtuLoginHeartHandler {
 
     public YouRenLoginHeartHandler(ConnectProperties connectProperties) {
+        super(connectProperties);
         this.connectProperties = connectProperties;
     }
 

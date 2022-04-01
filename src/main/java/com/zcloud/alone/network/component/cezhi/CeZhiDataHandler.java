@@ -1,7 +1,9 @@
 package com.zcloud.alone.network.component.cezhi;
 
 import cn.hutool.extra.spring.SpringUtil;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zcloud.alone.conf.ConnectProperties;
 import com.zcloud.alone.constant.AttrKeyConstant;
@@ -23,6 +25,7 @@ import com.zcloud.alone.util.CodeUtils;
 import com.zcloud.alone.util.EvalScriptUtils;
 import com.zcloud.alone.util.MathUtils;
 import com.zcloud.ginkgo.core.device.DeviceInfo;
+import com.zcloud.ginkgo.core.device.DeviceUniqueId;
 import com.zcloud.ginkgo.core.util.StringUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -32,8 +35,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.*;
 
 /**
@@ -45,6 +46,10 @@ import java.util.*;
 public class CeZhiDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
     private static final ObjectMapper GSON = new ObjectMapper();
+    static {
+        GSON.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        GSON.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
 
     private ConnectProperties connectProperties;
 
@@ -102,7 +107,7 @@ public class CeZhiDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
         String method = ceZhiModel.getMethod();
         method = method.replace("NTS", "");
         int methodMath = Integer.parseInt(method);
-        SyncHelper syncHelper = MsgManage.getSyncHelper(ceZhiModel.getDeviceId());
+        SyncHelper syncHelper = MsgManage.getSyncHelper(DeviceUniqueId.of(this.connectProperties.getProductId(),ceZhiModel.getDeviceId()));
         // 如果terminalNumber在SyncHelper中有值，则为主动下发指令的响应（绑定操作和主动采集）
         if (null != syncHelper) {
             String methodRequest = "NTS" + (methodMath - 1);
@@ -130,12 +135,12 @@ public class CeZhiDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
         String sendMessage = null;
         try {
             sendMessage = GSON.writeValueAsString(ceZhiModelResponse);
-            Channel channel = ChannelManage.getChannel(ceZhiModel.getDeviceId());
+            Channel channel = ChannelManage.getChannel(DeviceUniqueId.of(this.connectProperties.getProductId(),ceZhiModel.getDeviceId()));
             if (channel != null) {
                 channel.writeAndFlush(sendMessage);
-                log.info("通道{}-响应测智终端数据：{}", ceZhiModel.getDeviceId(), sendMessage);
+                log.info("产品ID:{},设备ID:{}-响应测智终端数据：{}", this.connectProperties.getProductId(),ceZhiModel.getDeviceId(), sendMessage);
             } else {
-                log.info("通道{}-响应测智终端数据失败，连接断开：", ceZhiModel.getDeviceId());
+                log.info("产品ID:{},设备ID:{}-响应测智终端数据失败，连接断开：", this.connectProperties.getProductId(),ceZhiModel.getDeviceId());
                 CommonHelper.deviceOffLine(this.connectProperties.getProductId(),ceZhiModel.getDeviceId());
             }
         } catch (JsonProcessingException e) {
@@ -168,7 +173,7 @@ public class CeZhiDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
                 DeviceInfo deviceInfo = CeZhiDataHelper.getDeviceLink(this.connectProperties.getProductId(),ceZhiModel, true);
                 if (deviceInfo == null) {
                     //如果获取设备绑定关系失败，则结束数据处理
-                    log.error("parseData cizhi 应答式上传弦式传感器数据,自报式上传弦式传感器数据 失败,productId:{},deviceId:{},terminalChannel:{},sensorAddress:{}",
+                    log.error("parseData cizhi 应答式上传弦式传感器数据,自报式上传弦式传感器数据 失败,产品ID:{},设备ID:{},terminalChannel:{},sensorAddress:{}",
                             connectProperties.getProductId(),ceZhiModel.getDeviceId(),ceZhiModel.getTerminalChannel(),ceZhiModel.getSensorAddress());
                     return;
                 }
@@ -178,7 +183,7 @@ public class CeZhiDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
                 DeviceInfo deviceInfo = CeZhiDataHelper.getDeviceLink(this.connectProperties.getProductId(),ceZhiModel, false);
                 if (deviceInfo == null) {
                     //如果获取设备绑定关系失败，则结束数据处理
-                    log.error("parseData cizhi 非弦式传感器获取设备绑定关系 失败,productId:{},deviceId:{},terminalChannel:{},sensorAddress:{}",
+                    log.error("parseData cizhi 非弦式传感器获取设备绑定关系 失败,产品ID:{},设备ID:{},terminalChannel:{},sensorAddress:{}",
                             connectProperties.getProductId(),ceZhiModel.getDeviceId(),ceZhiModel.getTerminalChannel(),ceZhiModel.getSensorAddress());
                     return;
                 }
@@ -199,7 +204,7 @@ public class CeZhiDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
         Double deviceLinkTimingFactor = feignAdapterImpl.getTimingFactor(deviceInfo.getProductId(),deviceInfo.getDeviceId());
         if(deviceLinkTimingFactor==null){
-            log.error("productId:{},deviceId:{}获取传感器的标定系数失败",deviceInfo.getProductId(),deviceInfo.getDeviceId());
+            log.error("产品ID:{},设备ID:{}获取传感器的标定系数失败",deviceInfo.getProductId(),deviceInfo.getDeviceId());
             return;
         }
         BigDecimal frequency = new BigDecimal(ceZhiModel.getMeasuredData1());
@@ -252,7 +257,7 @@ public class CeZhiDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
             GinkgoLinkClint ginkgoLinkClint = SpringUtil.getBean(GinkgoLinkClint.class);
             ginkgoLinkClint.pushPackeData(deviceInfo.getProductId(),deviceInfo.getDeviceId(),GSON.readValue(json, Map.class));
         } catch (Exception e) {
-            log.error("product:{},device:{},saveData error:{}",deviceInfo.getProductId(),deviceInfo.getDeviceId(),e.getMessage(),e);
+            log.error("产品ID:{},设备ID:{},saveData error:{}",deviceInfo.getProductId(),deviceInfo.getDeviceId(),e.getMessage(),e);
         }
     }
 }

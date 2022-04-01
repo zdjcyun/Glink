@@ -1,9 +1,11 @@
 package com.zcloud.alone.conf;
 
+import com.google.common.collect.Sets;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 @ConfigurationProperties(prefix = "iot")
@@ -63,6 +65,12 @@ public class IotProperties {
 
     public ServerConnectConfig getYouRenConnectConfig(){
         return this.connectConfig.get("youren");
+    }
+
+    public Set<String> getProductIds(){
+        Set<String> productIds = Sets.newHashSet();
+        this.connectConfig.forEach((k,v) -> productIds.add(v.getProductId()));
+        return productIds;
     }
 
     public String getHost() {

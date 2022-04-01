@@ -8,6 +8,7 @@ import com.zcloud.alone.network.helper.SyncHelper;
 import com.zcloud.alone.network.link.GinkgoLinkClint;
 import com.zcloud.alone.network.manage.MsgManage;
 import com.zcloud.alone.util.CodeUtils;
+import com.zcloud.ginkgo.core.device.DeviceUniqueId;
 import com.zcloud.ginkgo.core.message.DeviceMessageRawPayload;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -35,7 +36,7 @@ public class YouRenDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
 		Channel channel = ctx.channel();
 		//获取通道上对应的终端编号
 		String deviceId = channel.attr(AttrKeyConstant.TERMINAL_ID).get();
-		log.info("通道{}-{} 接受到待处理原始消息:{}", deviceId, channel.id().asShortText(), ByteBufUtil.hexDump(ByteBufUtil.getBytes(in)));
+		log.info("产品ID:{},设备ID:{}-{} 接受到待处理原始消息:{}", this.connectProperties.getProductId(),deviceId, channel.id().asShortText(), ByteBufUtil.hexDump(ByteBufUtil.getBytes(in)));
 		dealData(deviceId,in);
 	}
 	
@@ -49,7 +50,7 @@ public class YouRenDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
 			return;
 		}
 		// 获取发送给对应传感器指令的地址与传感器响应指令中的地址进行对比
-		SyncHelper syncHelper = MsgManage.getSyncHelper(deviceId);
+		SyncHelper syncHelper = MsgManage.getSyncHelper(DeviceUniqueId.of(this.connectProperties.getProductId(),deviceId));
 		if(null == syncHelper) {
 			log.warn("接受的消息没找到对应的发送消息体");
 			return;

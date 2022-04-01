@@ -46,11 +46,13 @@ public class KunPengDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
 		in.readBytes(bytes);
 		// 将字节数组转换为16进制字符串
 		String msg = CodeUtils.bytesToHex(bytes);
+		//String msg ="09 55 54 7F 73 99 44 8A 79 B0 41 6C 00 00 00 00 00 00 44 F2 5F 48 41 64 00 00 00 00 00 00 44 A3 25 D6 41 70 00 00 00 00 00 00 44 B0 FB 65 41 68 00 00 00 00 00 00 44 95 C5 2A 41 74 00 00 00 00 00 00 44 B7 25 AB 41 6C 00 00 00 00 00 00 44 AE 66 76 41 70 00 00 00 00 00 00 44 E3 77 8D 41 6C 00 00 00 00 00 00 44 A0 C2 C1 41 6C 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 5C 94";
+
 		//获取当前通道
 		Channel channel = ctx.channel();
 		//根据通道上对应的 deviceId
 		String deviceId = channel.attr(AttrKeyConstant.TERMINAL_ID).get();
-		log.info("通道{}-{} 接受到待处理原始消息:{}", deviceId, channel.id().asShortText(), msg);
+		log.info("产品ID:{},设备ID:{}-{} 接受到待处理原始消息:{}", this,connectProperties.getProductId(),deviceId, channel.id().asShortText(), msg);
 		dealData(deviceId, msg);
 	}
 
@@ -62,14 +64,14 @@ public class KunPengDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
 		List<DeviceInfo> deviceInfos = feignAdapterImpl.getSubDeviceInfo(this.connectProperties.getProductId(),deviceId);
 		if (CollectionUtil.isEmpty(deviceInfos)) {
-			log.error("=== ERROR === 根据终端编号:{} 查询设备绑定信息返回空值或多个值 === ERROR ====", deviceId);
+			log.error("=== ERROR === 根据产品ID:{},设备ID:{} 查询设备绑定信息返回空值或多个值 === ERROR ====", this.connectProperties.getProductId(),deviceId);
 			return;
 		}
 
 		msg = msg.replaceAll(" ", "");
 		String dataStr = msg.substring(12, msg.length() - 8);
 		if(dataStr.length() % 24 != 0){
-			log.error("=== ERROR === 终端编号:{} 传回的数据异常，无法解析 === ERROR ====", deviceId);
+			log.error("=== ERROR === 产品ID:{},设备ID:{} 传回的数据异常，无法解析 === ERROR ====", this.connectProperties.getProductId(),deviceId);
 			return;
 		}
 		String[] dataArr = new String[dataStr.length() / 24];
@@ -86,7 +88,7 @@ public class KunPengDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
 				String sensorKind = feignAdapterImpl.getSensorKind(deviceInfo.getProductId(),deviceInfo.getDeviceId());
 				Double timingFactor = feignAdapterImpl.getTimingFactor(deviceInfo.getProductId(),deviceInfo.getDeviceId());
 				if(terminalChannel==null || StringUtils.isBlank(sensorKind) || timingFactor==null || dataArr.length < terminalChannel){
-					log.error("dealData error productId:{},deviceId:{},terminalChannel:{},sensorKind:{},timingFactor:{},dataArr.length:{}",
+					log.error("dealData error 产品ID:{},设备ID:{},terminalChannel:{},sensorKind:{},timingFactor:{},dataArr.length:{}",
 							deviceInfo.getProductId(),deviceInfo.getDeviceId(),terminalChannel,sensorKind,timingFactor,dataArr.length);
 					continue;
 				}
@@ -110,7 +112,7 @@ public class KunPengDataHandler extends SimpleChannelInboundHandler<ByteBuf> {
 				//数据存储
 				ginkgoLinkClint.pushPackeData(deviceInfo.getProductId(),deviceInfo.getDeviceId(),objectMapper.readValue(dataJson,Map.class));
 			}catch (Exception e){
-				log.error("dealData error productId:{},deviceId:{} error:{}",deviceInfo.getProductId(),deviceInfo.getDeviceId(),e.getMessage());
+				log.error("dealData error 产品ID:{},设备ID:{} error:{}",deviceInfo.getProductId(),deviceInfo.getDeviceId(),e.getMessage());
 			}
 		}
 	}

@@ -4,19 +4,23 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.IdUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Stopwatch;
+import com.zcloud.alone.conf.IotProperties;
 import com.zcloud.alone.enums.ParserEnum;
 import com.zcloud.alone.network.device.FeignAdapterImpl;
 import com.zcloud.alone.network.entity.DtuDataModel;
 import com.zcloud.alone.network.helper.InteractiveHelper;
+import com.zcloud.alone.network.manage.DtuTaskManager;
 import com.zcloud.alone.network.parser.CommonParser;
 import com.zcloud.ginkgo.common.info.util.ShiroUserUtils;
 import com.zcloud.ginkgo.core.device.DeviceInfo;
 import com.zcloud.ginkgo.core.device.DeviceSessionInfo;
+import com.zcloud.ginkgo.core.device.DeviceUniqueId;
 import com.zcloud.ginkgo.core.message.*;
 import com.zcloud.ginkgo.core.message.payload.PropertyReportPayload;
 import com.zcloud.ginkgo.core.message.support.DeviceMessageBuilder;
 import com.zcloud.ginkgo.core.util.StringUtils;
 import com.zcloud.ginkgo.link.GinkgoLinkService;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
@@ -26,7 +30,7 @@ import javax.annotation.PostConstruct;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 @Slf4j
 @Component
@@ -41,6 +45,14 @@ public class GinkgoLinkClint {
     @Autowired
     private FeignAdapterImpl feignAdapterImpl;
 
+    @Autowired
+    private IotProperties properties;
+
+    private static Map<DeviceUniqueId, Semaphore> semaphore = new ConcurrentHashMap<>();
+
+    private ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(50, 100, 200, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<Runnable>(500));
+
     @PostConstruct
     public void init(){
         ginkgoLinkService.onSendToDeviceThingMsg().doOnNext(this::deviceAccept).subscribe();
@@ -52,7 +64,7 @@ public class GinkgoLinkClint {
      * @param deviceId
      */
     public void deviceConnected(String productId,String deviceId){
-        log.info("iothub-->ginkgo  deviceConnected  productId:{},deviceId:{} ",productId,deviceId);
+        log.info("iothub-->ginkgo  deviceConnected  产品ID:{},设备ID:{} ",productId,deviceId);
         ginkgoLinkService.deviceConnected( new DeviceSessionInfo(IdUtil.randomUUID(),productId,deviceId,null,null,System.currentTimeMillis()));
     }
 
@@ -62,7 +74,7 @@ public class GinkgoLinkClint {
      * @param deviceId
      */
     public void deviceDisconnected(String productId,String deviceId){
-        log.info("iothub-->ginkgo  deviceDisconnected  productId:{},deviceId:{} ",productId,deviceId);
+        log.info("iothub-->ginkgo  deviceDisconnected  产品ID:{},设备ID:{} ",productId,deviceId);
         ginkgoLinkService.deviceDisconnected( new DeviceSessionInfo(IdUtil.randomUUID(),productId,deviceId,null,null,System.currentTimeMillis()));
     }
 
@@ -75,7 +87,7 @@ public class GinkgoLinkClint {
     public void pushPackeData(String productId, String deviceId, Map<String,Object> values) {
         PropertyReportPayload payload = new PropertyReportPayload();
         payload.setParams(values);
-        log.info("iothub-->ginkgo  pushPackeData productId:{},deviceId:{} values:{} ",productId,deviceId,values);
+        log.info("iothub-->ginkgo  pushPackeData 产品ID:{},设备ID:{} values:{} ",productId,deviceId,values);
         this.receivedDeviceMsg(productId, deviceId, payload);
     }
 
@@ -86,7 +98,7 @@ public class GinkgoLinkClint {
      * @param payload
      */
     public void receivedDeviceMsg(String productId, String deviceId, DeviceMessagePayload payload){
-        log.info("iothub-->ginkgo  receivedDeviceMsg productId:{},deviceId:{}, payload:{} ",productId,deviceId,payload);
+        log.info("iothub-->ginkgo  receivedDeviceMsg 产品ID:{},设备ID:{}, payload:{} ",productId,deviceId,payload);
         final DeviceMessage<?> message = new DeviceMessageBuilder()
                 .withProductId(productId)
                 .withDeviceId(deviceId)
@@ -106,7 +118,7 @@ public class GinkgoLinkClint {
             log.error("产品:{} 设备:{},子产品：{},子设备：{}, 查询指令:{} 传感器地址sensorAddr 为空", productId, deviceId, subpProductId,subDeviceId,queryInstruct);
             return null;
         }
-        String deviceResult = InteractiveHelper.sendAndGetRes(deviceId, subDeviceId, sensorAddr, queryInstruct, false);
+        String deviceResult = InteractiveHelper.sendAndGetRes(productId,deviceId, subDeviceId, sensorAddr, queryInstruct, false);
         log.info("产品:{} 设备:{} ,子产品：{},子设备：{},查询指令:{},返回结果:{},cost:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,deviceResult,stopwatch.elapsed(TimeUnit.MILLISECONDS));
         if(deviceResult == null){
             return null;
@@ -133,25 +145,71 @@ public class GinkgoLinkClint {
      * @param ginkgoDeviceMessage
      */
     private void deviceAccept(DeviceMessage<DeviceMessageThingPayload> ginkgoDeviceMessage) {
+        log.info("device kafka Accept,产品:{} 设备:{}",ginkgoDeviceMessage.productId(),ginkgoDeviceMessage.deviceId());
         if (!Objects.equals(DeviceMessageType.TASK, ginkgoDeviceMessage.getPayload().getMessageType())) {
+            //非task类型的任务
+            log.debug("MessageType:{} is not task messageType",ginkgoDeviceMessage.getPayload().getMessageType());
             return;
         }
-        List<DeviceInfo> subDeviceInfos = feignAdapterImpl.getSubDeviceInfo(ginkgoDeviceMessage.productId(), ginkgoDeviceMessage.deviceId());
-        if (CollectionUtil.isEmpty(subDeviceInfos)) {
-            log.error("产品:{} 设备:{} 获取不到子设备", ginkgoDeviceMessage.productId(), ginkgoDeviceMessage.deviceId());
+        if(!properties.getProductIds().contains(ginkgoDeviceMessage.productId())){
+            //非standalone的产品不需要执行相应的任务
+            log.debug("productId:{} is not standalone process",ginkgoDeviceMessage.productId());
             return;
         }
-        subDeviceInfos.stream().forEach(subDeviceInfo -> {
+        DeviceUniqueId taskDeviceUniqueId = DeviceUniqueId.of(ginkgoDeviceMessage.productId(), ginkgoDeviceMessage.deviceId());
+        semaphore.putIfAbsent(taskDeviceUniqueId, new Semaphore(1));
+        poolExecutor.execute(new CollectInstructRunnable(taskDeviceUniqueId));
+    }
+
+
+    /**
+     * 采集指令任务
+     */
+    public class CollectInstructRunnable implements Runnable {
+        /**任务网关设备号**/
+        private DeviceUniqueId taskDeviceUniqueId;
+
+        public CollectInstructRunnable(DeviceUniqueId taskDeviceUniqueId) {
+            this.taskDeviceUniqueId = taskDeviceUniqueId;
+        }
+
+        @SneakyThrows
+        @Override
+        public void run() {
+            if(semaphore.get(taskDeviceUniqueId) == null || !DtuTaskManager.taskIsActive(taskDeviceUniqueId)){
+                log.debug("产品:{} 设备:{} 通过关闭，不需要做任务采集");
+                return;
+            }
             try {
+                if(!semaphore.get(taskDeviceUniqueId).tryAcquire()){
+                    log.debug("产品:{} 设备:{} 正在执行采集指令，无法获取执行锁");
+                    return;
+                }
                 //采集指令
-                String collectInstruct = feignAdapterImpl.getCollectInstruct(subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId());
-                DtuDataModel dtuDataMode = this.getDtuDataModel(ginkgoDeviceMessage.productId(), ginkgoDeviceMessage.deviceId(), subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId(), collectInstruct);
-                if (dtuDataMode != null) {
-                    this.receivedDeviceMsg(ginkgoDeviceMessage.productId(), ginkgoDeviceMessage.deviceId(), DeviceMessageRawPayload.of(GSON.writeValueAsBytes(dtuDataMode.getResult())));
+                List<DeviceInfo> subDeviceInfos = feignAdapterImpl.getSubDeviceInfo(taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId());
+                if (CollectionUtil.isEmpty(subDeviceInfos)) {
+                    log.error("产品:{} 设备:{} 获取不到子设备", taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId());
+                    return;
+                }
+                for (DeviceInfo subDeviceInfo : subDeviceInfos) {
+                    try {
+                        String collectInstruct = feignAdapterImpl.getCollectInstruct(subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId());
+                        DtuDataModel dtuDataMode = getDtuDataModel(taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId(), subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId(), collectInstruct);
+                        if (dtuDataMode != null) {
+                            receivedDeviceMsg(subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId(), DeviceMessageRawPayload.of(GSON.writeValueAsBytes(dtuDataMode.getResult())));
+                        }
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                    }
                 }
             } catch (Exception e) {
-                log.error(e.getMessage(), e);
+                log.error(e.getMessage(),e);
+            }finally {
+                if(semaphore.get(taskDeviceUniqueId)!=null) {
+                    semaphore.get(taskDeviceUniqueId).release();
+                }
+                semaphore.remove(taskDeviceUniqueId);
             }
-        });
+        }
     }
 }

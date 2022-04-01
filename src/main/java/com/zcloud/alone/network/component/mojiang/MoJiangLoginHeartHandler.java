@@ -3,23 +3,22 @@ package com.zcloud.alone.network.component.mojiang;
 import com.zcloud.alone.conf.ConnectProperties;
 import com.zcloud.alone.constant.AttrKeyConstant;
 import com.zcloud.alone.network.annotation.NettyHandler;
-import com.zcloud.alone.network.handler.LoginHeartHandler;
+import com.zcloud.alone.network.handler.DtuLoginHeartHandler;
 import com.zcloud.alone.network.helper.CommonHelper;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.Date;
-
 /**
  * @author xuhsanbin
  */
 @Slf4j
 @NettyHandler(nettyServer = {"mojiang"},order = 1)
-public class MoJiangLoginHeartHandler extends LoginHeartHandler {
+public class MoJiangLoginHeartHandler extends DtuLoginHeartHandler {
 
     public MoJiangLoginHeartHandler(ConnectProperties connectProperties) {
+        super(connectProperties);
         this.connectProperties = connectProperties;
     }
 
@@ -47,7 +46,7 @@ public class MoJiangLoginHeartHandler extends LoginHeartHandler {
         String channelId = ctx.channel().id().asShortText();
         //更新终端为在线状态
         CommonHelper.deviceOnLine(this.connectProperties.getProductId(),deviceId);
-        log.info("设备{}-{} 心跳包：{}", deviceId, channelId, msg);
+        log.info("产品ID:{},设备ID:{}-{} 心跳包：{}", this.connectProperties.getProductId(),deviceId, channelId, msg);
         lossConnectTime = 0;
     }
 

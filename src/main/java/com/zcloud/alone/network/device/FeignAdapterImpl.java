@@ -13,15 +13,13 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.zcloud.alone.network.device.feign.client.HubDeviceFeignClient;
-import com.zcloud.alone.network.entity.DeviceIdentity;
 import com.zcloud.ginkgo.core.device.DeviceInfo;
+import com.zcloud.ginkgo.core.device.DeviceUniqueId;
 import com.zcloud.ginkgo.core.device.defaults.DefaultDeviceOperator;
 import com.zcloud.ginkgo.core.web.RestApiResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -52,12 +50,12 @@ public class FeignAdapterImpl {
     /***
      * 设备标签缓存
      */
-    private LoadingCache<DeviceIdentity, Map<String,String>> bigTagLoadingCache;
+    private LoadingCache<DeviceUniqueId, Map<String,String>> bigTagLoadingCache;
 
     /***
      * 子设备缓存
      */
-    private LoadingCache<DeviceIdentity, List<DefaultDeviceOperator>> subDeviceLoadingCache;
+    private LoadingCache<DeviceUniqueId, List<DefaultDeviceOperator>> subDeviceLoadingCache;
 
     @Autowired
     private HubDeviceFeignClient hubDeviceFeignClient;
@@ -65,17 +63,17 @@ public class FeignAdapterImpl {
     @PostConstruct
     public void init(){
         //根据设备产品获取标签数据
-        bigTagLoadingCache = CacheBuilder.newBuilder().expireAfterWrite(Duration.ofSeconds(10)).expireAfterAccess(Duration.ofSeconds(10)).build(new CacheLoader<DeviceIdentity, Map<String,String>>() {
+        bigTagLoadingCache = CacheBuilder.newBuilder().expireAfterWrite(Duration.ofSeconds(10)).expireAfterAccess(Duration.ofSeconds(10)).build(new CacheLoader<DeviceUniqueId, Map<String,String>>() {
             @Override
-            public Map<String,String> load(DeviceIdentity deviceIdentity) {
+            public Map<String,String> load(DeviceUniqueId deviceIdentity) {
                 return getDeviceBizTag(deviceIdentity);
             }
         });
 
         //子设备缓存
-        subDeviceLoadingCache = CacheBuilder.newBuilder().expireAfterWrite(Duration.ofSeconds(10)).expireAfterAccess(Duration.ofSeconds(10)).build(new CacheLoader<DeviceIdentity, List<DefaultDeviceOperator>>() {
+        subDeviceLoadingCache = CacheBuilder.newBuilder().expireAfterWrite(Duration.ofSeconds(10)).expireAfterAccess(Duration.ofSeconds(10)).build(new CacheLoader<DeviceUniqueId, List<DefaultDeviceOperator>>() {
             @Override
-            public List<DefaultDeviceOperator> load(DeviceIdentity deviceIdentity) {
+            public List<DefaultDeviceOperator> load(DeviceUniqueId deviceIdentity) {
                 return getSubDevices(deviceIdentity);
             }
         });
@@ -86,7 +84,7 @@ public class FeignAdapterImpl {
      * @param deviceIdentity
      * @return
      */
-    private Map<String,String> getDeviceBizTag(DeviceIdentity deviceIdentity){
+    private Map<String,String> getDeviceBizTag(DeviceUniqueId deviceIdentity){
         RestApiResult<Map<String,String>> restApiResult = hubDeviceFeignClient.getStandardBizTag(deviceIdentity.getProductId(),deviceIdentity.getDeviceId());
         if(restApiResult==null || !Objects.equals(RestApiResult.SUCCESS_CODE,restApiResult.getCode())){
             return Maps.newHashMap();
@@ -94,7 +92,7 @@ public class FeignAdapterImpl {
         return restApiResult.getData();
     }
 
-    private List<DefaultDeviceOperator> getSubDevices(DeviceIdentity deviceIdentity) {
+    private List<DefaultDeviceOperator> getSubDevices(DeviceUniqueId deviceIdentity) {
         Stopwatch stopwatch = Stopwatch.createStarted();
         List<DefaultDeviceOperator> result = Lists.newArrayList();
         try{
@@ -111,7 +109,7 @@ public class FeignAdapterImpl {
     public List<DeviceInfo> getSubDeviceInfo(String productId, String deviceId){
         List<DeviceInfo> deviceInfos = Lists.newArrayList();
         try{
-            List<DefaultDeviceOperator> list = subDeviceLoadingCache.get(DeviceIdentity.of(productId, deviceId));
+            List<DefaultDeviceOperator> list = subDeviceLoadingCache.get(DeviceUniqueId.of(productId, deviceId));
             if(CollectionUtil.isEmpty(list)){
                 return deviceInfos;
             }
@@ -124,7 +122,7 @@ public class FeignAdapterImpl {
 
     public Map<String,String> getDeviceBizTag(String productId,String deviceId){
         try{
-            return bigTagLoadingCache.get(DeviceIdentity.of(productId, deviceId));
+            return bigTagLoadingCache.get(DeviceUniqueId.of(productId, deviceId));
         }catch (Exception e){
             log.error(e.getMessage(),e);
         }

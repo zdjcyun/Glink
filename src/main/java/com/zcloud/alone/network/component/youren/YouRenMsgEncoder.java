@@ -29,7 +29,7 @@ public class YouRenMsgEncoder extends MessageToByteEncoder<String> {
 		//需要发送的消息
 		Channel channel = ctx.channel();
 		String terminalId = channel.attr(AttrKeyConstant.TERMINAL_ID).get();
-		log.info("通道{}-{} 下发采集指令:{}", terminalId, channel.id().asShortText(), msg);
+		log.info("产品ID:{},设备ID:{}-{} 下发采集指令:{}", this.connectProperties.getProductId(),terminalId, channel.id().asShortText(), msg);
 		byte[] bytes = CodeUtils.hexToBytes(msg);
 		out.writeBytes(bytes);
 	}

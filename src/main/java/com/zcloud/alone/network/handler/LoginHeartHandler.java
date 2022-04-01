@@ -6,6 +6,7 @@ import com.zcloud.alone.constant.AttrKeyConstant;
 import com.zcloud.alone.network.helper.CommonHelper;
 import com.zcloud.alone.network.manage.ChannelManage;
 import com.zcloud.alone.util.CodeUtils;
+import com.zcloud.ginkgo.core.device.DeviceUniqueId;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -43,14 +44,15 @@ public class LoginHeartHandler extends SimpleChannelInboundHandler<ByteBuf> {
 				String channelId = channel.id().asShortText();
 				log.info("设备{}-{}建立连接!", terminalId, channelId);
 				//如果缓存中有以前有相同的终端编号的通道，则关闭该通道
-				Channel oldChannel = ChannelManage.getChannel(terminalId);
+				Channel oldChannel = ChannelManage.getChannel(DeviceUniqueId.of(connectProperties.getProductId(),terminalId));
 				if(null != oldChannel){
 					log.debug("terminalId:{} 缓存中有以前有相同的终端编号的通道，关闭该通道",terminalId);
 					oldChannel.close();
 				}
 				//将新通道加入到缓存中
-				ChannelManage.putChannel(terminalId, channel);
+				ChannelManage.putChannel(DeviceUniqueId.of(connectProperties.getProductId(),terminalId), channel);
 				//更新终端为在线状态
+				CommonHelper.deviceOnLine(this.connectProperties.getProductId(),terminalId);
 				callBackActive(terminalId, channelId);
 			}else{ //解析注册包失败，获取终端编号失败，则是非适配终端或者非认证终端接入，直接关闭通道
 				log.warn("解析注册包失败，获取终端编号失败，则是非适配终端或者非认证终端接入，直接关闭通道");
@@ -97,8 +99,8 @@ public class LoginHeartHandler extends SimpleChannelInboundHandler<ByteBuf> {
 			String terminalId = ctx.channel().attr(AttrKeyConstant.TERMINAL_ID).get();
 			String channelId = ctx.channel().id().asShortText();
 			//更新终端为在线状态
+			CommonHelper.deviceOnLine(this.connectProperties.getProductId(),terminalId);
 			callBackActive(terminalId, channelId);
-			log.info("设备{}-{} 心跳包：{}", terminalId, channelId, msg);
 			lossConnectTime = 0;
 		} else { //如果不是心跳包，往下放，交给数据处理handler处理
 			ReferenceCountUtil.retain(in);
@@ -157,6 +159,7 @@ public class LoginHeartHandler extends SimpleChannelInboundHandler<ByteBuf> {
 				if(lossConnectTime > 2){
 					log.error("设备{}-{} 关闭不活跃的通道!", terminalId, channelId);
 					ctx.channel().close();
+					CommonHelper.deviceOffLine(this.connectProperties.getProductId(),terminalId);
 					callBackInactive(terminalId, channelId);
 				}
 			}
@@ -205,7 +208,6 @@ public class LoginHeartHandler extends SimpleChannelInboundHandler<ByteBuf> {
 	 * @param socketId
 	 */
 	protected void callBackActive(String deviceId, String socketId) {
-		CommonHelper.deviceOnLine(this.connectProperties.getProductId(),deviceId);
 	}
 
 	/**
@@ -214,6 +216,5 @@ public class LoginHeartHandler extends SimpleChannelInboundHandler<ByteBuf> {
 	 * @param socketId
 	 */
 	protected void callBackInactive(String deviceId, String socketId) {
-		CommonHelper.deviceOffLine(this.connectProperties.getProductId(),deviceId);
 	}
 }

@@ -3,6 +3,7 @@ package com.zcloud.alone.network.helper;
 import com.zcloud.alone.network.manage.ChannelManage;
 import com.zcloud.alone.network.manage.MsgManage;
 import com.zcloud.alone.network.manage.ThreadManage;
+import com.zcloud.ginkgo.core.device.DeviceUniqueId;
 import io.netty.channel.Channel;
 import lombok.extern.slf4j.Slf4j;
 
@@ -17,6 +18,7 @@ public class InteractiveHelper {
 
     /**
      * 发送指令并获取返回的结果
+     * @param productId 产品ID
      * @param deviceId 设备ID
      * @param subDeviceId 子设备ID
      * @param sensorAddr  子设备地址
@@ -24,10 +26,10 @@ public class InteractiveHelper {
      * @param isDelay  是否延时
      * @return
      */
-    public static String sendAndGetRes(String deviceId, String subDeviceId, String sensorAddr, Object queryInstruct, boolean isDelay) {
-        Channel channel = ChannelManage.getChannel(deviceId);
+    public static String sendAndGetRes(String productId,String deviceId, String subDeviceId, String sensorAddr, Object queryInstruct, boolean isDelay) {
+        Channel channel = ChannelManage.getChannel(DeviceUniqueId.of(productId,deviceId));
         if(channel==null){
-            log.error("deviceId:{},subDeviceId:{},sensorAddr:{}发送指令{}失败：channel is null", deviceId,subDeviceId,sensorAddr,queryInstruct);
+            log.error("产品:{},设备:{},subDeviceId:{},sensorAddr:{}发送指令{}失败：channel is null", productId,deviceId,subDeviceId,sensorAddr,queryInstruct);
             return null;
         }
         // 设置线程状态变量
@@ -36,20 +38,20 @@ public class InteractiveHelper {
         syncHelper.setSensorAddr(sensorAddr);
         syncHelper.setSendFlag((String) queryInstruct);
         syncHelper.setDelay(isDelay);
-        log.debug("添加发送消息的唯一标识:{}", deviceId);
+        log.debug("添加发送消息的唯一标识 产品:{},设备:{}", productId,deviceId);
         // 保存发送消息的唯一标识
-        MsgManage.putSyncHelper(deviceId, syncHelper);
+        MsgManage.putSyncHelper(DeviceUniqueId.of(productId,deviceId), syncHelper);
         // 发送查询指令
         channel.writeAndFlush(queryInstruct);
         try {
             // 获取返回结果，如果结果没有返回，则阻塞该线程(超时时间10秒)
             return syncHelper.get(10, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            log.error("发送指令{}失败：{}", queryInstruct, e.getMessage());
+            log.error("产品:{},设备:{} 发送指令{}失败：{}",productId,deviceId,queryInstruct, e.getMessage());
         } finally {
-            log.debug("移除发送消息的唯一标识:{}", deviceId);
+            log.debug("移除发送消息的唯一标识 产品:{},设备:{}", productId,deviceId);
             // 移除发送消息的唯一标识
-            MsgManage.removeSyncHelper(deviceId);
+            MsgManage.removeSyncHelper(DeviceUniqueId.of(productId,deviceId));
         }
         return null;
     }

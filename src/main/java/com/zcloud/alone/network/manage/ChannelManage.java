@@ -1,5 +1,6 @@
 package com.zcloud.alone.network.manage;
 
+import com.zcloud.ginkgo.core.device.DeviceUniqueId;
 import io.netty.channel.Channel;
 
 import java.util.Map;
@@ -15,34 +16,34 @@ public class ChannelManage {
 	/**
 	 * 存放终端编号和通道的映射关系
 	 */
-	private static final Map<String, Channel> CHANNEL_MAP = new ConcurrentHashMap<String, Channel>();
+	private static final Map<DeviceUniqueId, Channel> CHANNEL_MAP = new ConcurrentHashMap<DeviceUniqueId, Channel>();
 
-	public static Map<String, Channel> getChannelMap() {
+	public static Map<DeviceUniqueId, Channel> getChannelMap() {
 		return CHANNEL_MAP;
 	}
 
-	public static Channel getChannel(String deviceId) {
-		return CHANNEL_MAP.get(deviceId);
+	public static Channel getChannel(DeviceUniqueId deviceUniqueId) {
+		return CHANNEL_MAP.get(deviceUniqueId);
 	}
 	
-	public static void putChannel(String deviceId, Channel channel) {
-		CHANNEL_MAP.put(deviceId, channel);
+	public static void putChannel(DeviceUniqueId deviceUniqueId, Channel channel) {
+		CHANNEL_MAP.put(deviceUniqueId, channel);
     }
 
-	public static void removeChannel(String deviceId) {
-		CHANNEL_MAP.remove(deviceId);
+	public static void removeChannel(DeviceUniqueId deviceUniqueId) {
+		CHANNEL_MAP.remove(deviceUniqueId);
     }
 
 	public static void removeChannel(Channel channel) {
 		CHANNEL_MAP.entrySet().stream().filter(entry -> entry.getValue() == channel).forEach(entry -> CHANNEL_MAP.remove(entry.getKey()));
     }
 	
-	public static boolean isChannelAvailable(String deviceId) {
-		Channel channel = getChannel(deviceId);
+	public static boolean isChannelAvailable(DeviceUniqueId deviceUniqueId) {
+		Channel channel = getChannel(deviceUniqueId);
 		return (null != channel && channel.isActive()) ? true : false;
 	}
 
-	public static boolean isChannelNotAvailable(String deviceId) {
-		return !isChannelAvailable(deviceId);
+	public static boolean isChannelNotAvailable(DeviceUniqueId deviceUniqueId) {
+		return !isChannelAvailable(deviceUniqueId);
 	}
 }
