@@ -28,10 +28,6 @@ public class InteractiveHelper {
      */
     public static String sendAndGetRes(String productId,String deviceId, String subDeviceId, String sensorAddr, Object queryInstruct, boolean isDelay) {
         Channel channel = ChannelManage.getChannel(DeviceUniqueId.of(productId,deviceId));
-        if(channel==null){
-            log.error("产品:{},设备:{},subDeviceId:{},sensorAddr:{}发送指令{}失败：channel is null", productId,deviceId,subDeviceId,sensorAddr,queryInstruct);
-            return null;
-        }
         // 设置线程状态变量
         SyncHelper syncHelper = new SyncHelper();
         syncHelper.setSubDeviceId(subDeviceId);
@@ -41,6 +37,10 @@ public class InteractiveHelper {
         log.debug("添加发送消息的唯一标识 产品:{},设备:{}", productId,deviceId);
         // 保存发送消息的唯一标识
         MsgManage.putSyncHelper(DeviceUniqueId.of(productId,deviceId), syncHelper);
+        if(channel==null){
+            log.error("产品:{},设备:{},subDeviceId:{},sensorAddr:{}发送指令{}失败：channel is null", productId,deviceId,subDeviceId,sensorAddr,queryInstruct);
+            return null;
+        }
         // 发送查询指令
         channel.writeAndFlush(queryInstruct);
         try {

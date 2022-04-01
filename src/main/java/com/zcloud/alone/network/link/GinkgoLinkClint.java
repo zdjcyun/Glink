@@ -2,6 +2,7 @@ package com.zcloud.alone.network.link;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Stopwatch;
 import com.zcloud.alone.conf.IotProperties;
@@ -50,8 +51,8 @@ public class GinkgoLinkClint {
 
     private static Map<DeviceUniqueId, Semaphore> semaphore = new ConcurrentHashMap<>();
 
-    private ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(50, 100, 200, TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<Runnable>(500));
+    private ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(50, 100, 200, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<Runnable>(1000));
 
     @PostConstruct
     public void init(){
@@ -125,7 +126,7 @@ public class GinkgoLinkClint {
         }
         String replyInstruct = deviceResult.replace(" ", "").toUpperCase();
         //获取指令脚本
-        String parserInstructTag = feignAdapterImpl.getScriptFileName(productId,subDeviceId);
+        String parserInstructTag = feignAdapterImpl.getScriptFileName(subpProductId,subDeviceId);
         if(StringUtils.isBlank(parserInstructTag)){
             log.error("产品:{} 设备:{} ,子产品：{},子设备：{},解析指令:{} 收到返回指令:{}解析指令出现异常:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,deviceResult, parserInstructTag);
             return null;
@@ -136,6 +137,11 @@ public class GinkgoLinkClint {
         if (!ParserEnum.Constant.NORMAL.equals(dtuDataModel.getCode())) {
             log.error("产品:{} 设备:{}，子产品：{},子设备：{}, 解析指令:{} 收到返回指令:{}解析指令出现异常:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,deviceResult, dtuDataModel.getResult());
             return null;
+        }
+        try{
+            log.debug("产品:{} 设备:{} 采集指令:{} 采集结果:{}",GSON.writeValueAsString(dtuDataModel));
+        }catch (Exception e){
+            log.error(e.getMessage(),e);
         }
         return dtuDataModel;
     }
@@ -191,17 +197,22 @@ public class GinkgoLinkClint {
                     log.error("产品:{} 设备:{} 获取不到子设备", taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId());
                     return;
                 }
-                for (DeviceInfo subDeviceInfo : subDeviceInfos) {
+                subDeviceInfos.forEach(subDeviceInfo -> {
                     try {
                         String collectInstruct = feignAdapterImpl.getCollectInstruct(subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId());
+                        if (StringUtils.isBlank(collectInstruct)) {
+                            log.error("产品:{} 设备:{} collectInstruct:{}为空", taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId(), collectInstruct);
+                            return;
+                        }
                         DtuDataModel dtuDataMode = getDtuDataModel(taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId(), subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId(), collectInstruct);
+
                         if (dtuDataMode != null) {
-                            receivedDeviceMsg(subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId(), DeviceMessageRawPayload.of(GSON.writeValueAsBytes(dtuDataMode.getResult())));
+                            pushPackeData(subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId(), GSON.readValue(dtuDataMode.getResult(), Map.class));
                         }
                     } catch (Exception e) {
                         log.error(e.getMessage(), e);
                     }
-                }
+                });
             } catch (Exception e) {
                 log.error(e.getMessage(),e);
             }finally {

@@ -3,34 +3,66 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <artifactId>ginkgo</artifactId>
-        <groupId>com.zcloud.ginkgo</groupId>
-        <version>1.0.0</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.4.2</version>
+        <relativePath/>
     </parent>
     <packaging>jar</packaging>
-
     <artifactId>ginkgo-standalone</artifactId>
     <name>ginkgo-standalone</name>
+    <groupId>com.zcloud.ginkgo</groupId>
+    <version>1.0.0</version>
     <description>ginkgo-standalone</description>
     <properties>
         <java.version>1.8</java.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <ginkgo-modules.version>1.1.0-SNAPSHOT</ginkgo-modules.version>
+        <spring-boot.version>2.4.2</spring-boot.version>
+        <spring-cloud.version>2020.0.2</spring-cloud.version>
+        <spring-cloud-alibaba.version>2020.0.RC1</spring-cloud-alibaba.version>
+        <spring-integration.version>5.4.3</spring-integration.version>
+        <lombok.version>1.18.12</lombok.version>
+        <knife4j.version>3.0.2</knife4j.version>
+        <guaua.version>30.0-jre</guaua.version>
+        <spring-cloud-starter-bootstrap.version>3.0.2</spring-cloud-starter-bootstrap.version>
+        <spring-cloud-context.version>3.0.2</spring-cloud-context.version>
+        <netty-all.version>4.1.63.Final</netty-all.version>
     </properties>
     <dependencies>
         <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-bootstrap</artifactId>
+            <version>${spring-cloud-starter-bootstrap.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+            <version>${spring-cloud-alibaba.version}</version>
         </dependency>
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+            <version>${spring-cloud-alibaba.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-spring-boot-starter</artifactId>
+            <version>${knife4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-bootstrap</artifactId>
+            <version>${knife4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+            <version>${knife4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -39,10 +71,22 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
+            <version>${knife4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
+            <version>${spring-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-context</artifactId>
+            <version>${spring-cloud-context.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.integration</groupId>
+            <artifactId>spring-integration-core</artifactId>
+            <version>${spring-integration.version}</version>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
@@ -84,6 +128,7 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
+            <version>${netty-all.version}</version>
         </dependency>
 
         <dependency>
@@ -105,6 +150,11 @@
             <groupId>ma.glasnost.orika</groupId>
             <artifactId>orika-core</artifactId>
             <version>1.5.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guaua.version}</version>
         </dependency>
 
         <dependency>

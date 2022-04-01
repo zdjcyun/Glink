@@ -199,4 +199,15 @@ public class FeignAdapterImpl {
         return MapUtil.getStr(this.getDeviceBizTag(productId, deviceId),"collectInstruct");
     }
 
+    /**
+     * 是否为DTU链接的传感器
+     * @param productId
+     * @param deviceId
+     * @return
+     */
+    public boolean isDtuSensor(String productId,String deviceId){
+        String sensorManage = MapUtil.getStr(this.getDeviceBizTag(productId, deviceId),"isSensorManage");
+        return Objects.equals("true",sensorManage);
+    }
+
 }
