@@ -111,7 +111,12 @@ public class GinkgoLinkClint {
     }
 
 
-    private DtuDataModel getDtuDataModel(String productId,String deviceId,String subpProductId,String subDeviceId,Object queryInstruct){
+    private DtuDataModel getDtuDataModel(String productId,String deviceId,String subpProductId,String subDeviceId){
+        String queryInstruct = feignAdapterImpl.getCollectInstruct(subpProductId, subDeviceId);
+        if (StringUtils.isBlank(queryInstruct)) {
+            log.error("产品:{} 设备:{} 采集指令:{}为空", subpProductId, subDeviceId, queryInstruct);
+            return null;
+        }
         log.info("产品:{} 设备:{},子产品：{},子设备：{}, 查询指令:{}", productId, deviceId, subpProductId,subDeviceId,queryInstruct);
         Stopwatch stopwatch = Stopwatch.createStarted();
         String sensorAddr = feignAdapterImpl.getSensorAddr(subpProductId,subDeviceId);
@@ -119,31 +124,36 @@ public class GinkgoLinkClint {
             log.error("产品:{} 设备:{},子产品：{},子设备：{}, 查询指令:{} 传感器地址sensorAddr 为空", productId, deviceId, subpProductId,subDeviceId,queryInstruct);
             return null;
         }
-        String deviceResult = InteractiveHelper.sendAndGetRes(productId,deviceId, subDeviceId, sensorAddr, queryInstruct, false);
-        log.info("产品:{} 设备:{} ,子产品：{},子设备：{},查询指令:{},返回结果:{},cost:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,deviceResult,stopwatch.elapsed(TimeUnit.MILLISECONDS));
-        if(deviceResult == null){
-            return null;
-        }
-        String replyInstruct = deviceResult.replace(" ", "").toUpperCase();
         //获取指令脚本
         String parserInstructTag = feignAdapterImpl.getScriptFileName(subpProductId,subDeviceId);
         if(StringUtils.isBlank(parserInstructTag)){
-            log.error("产品:{} 设备:{} ,子产品：{},子设备：{},解析指令:{} 收到返回指令:{}解析指令出现异常:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,deviceResult, parserInstructTag);
+            log.error("产品:{} 设备:{} ,子产品：{},子设备：{},解析指令:{} 获取指令脚本为空:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,parserInstructTag);
             return null;
         }
-        // 解析返回的数据
-        log.info("产品:{} 设备:{}，子产品：{},子设备：{}, 解析翻译脚本:{},解析指令:{}", productId, deviceId,subpProductId,subDeviceId, parserInstructTag,replyInstruct);
-        DtuDataModel dtuDataModel = CommonParser.parserInstruct(parserInstructTag, replyInstruct);
-        if (!ParserEnum.Constant.NORMAL.equals(dtuDataModel.getCode())) {
-            log.error("产品:{} 设备:{}，子产品：{},子设备：{}, 解析指令:{} 收到返回指令:{}解析指令出现异常:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,deviceResult, dtuDataModel.getResult());
-            return null;
+        // 重发指令次数
+        int retry = 2;
+        //如果消息没有返回，或结算数据错误，进行重发指令
+        for (int i = 1; i <= retry; i++) {
+            String deviceResult = InteractiveHelper.sendAndGetRes(productId,deviceId, subDeviceId, sensorAddr, queryInstruct, false);
+            log.info("产品:{} 设备:{} ,子产品：{},子设备：{},查询指令:{},返回结果:{},cost:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,deviceResult,stopwatch.elapsed(TimeUnit.MILLISECONDS));
+            if(deviceResult == null){
+                log.error("产品:{} 设备:{} ,子产品：{},子设备：{},查询指令:{},第{}次 没有收到数据",  productId, deviceId,subpProductId,subDeviceId, queryInstruct,i);
+                // 重发指定次数后仍无数据返回
+                continue;
+            }
+            String replyInstruct = deviceResult.replace(" ", "").toUpperCase();
+            // 解析返回的数据
+            log.info("产品:{} 设备:{}，子产品：{},子设备：{}, 解析翻译脚本:{},解析指令:{}", productId, deviceId,subpProductId,subDeviceId, parserInstructTag,replyInstruct);
+            DtuDataModel dtuDataModel = CommonParser.parserInstruct(parserInstructTag, replyInstruct);
+            // 如果解析指令出现异常，则进入下一循环，重新发送指令
+            if (!ParserEnum.Constant.NORMAL.equals(dtuDataModel.getCode())) {
+                log.error("产品:{} 设备:{}，子产品：{},子设备：{}, 解析指令:{} 收到返回指令:{}解析指令出现异常:{}", productId, deviceId,subpProductId,subDeviceId, queryInstruct,deviceResult, dtuDataModel.getResult());
+                continue;
+            }
+            log.debug("产品:{} 设备:{} 采集指令:{} 采集结果:{}",dtuDataModel.getResult());
+            return dtuDataModel;
         }
-        try{
-            log.debug("产品:{} 设备:{} 采集指令:{} 采集结果:{}",GSON.writeValueAsString(dtuDataModel));
-        }catch (Exception e){
-            log.error(e.getMessage(),e);
-        }
-        return dtuDataModel;
+        return null;
     }
 
     /**
@@ -183,12 +193,12 @@ public class GinkgoLinkClint {
         @Override
         public void run() {
             if(semaphore.get(taskDeviceUniqueId) == null || !DtuTaskManager.taskIsActive(taskDeviceUniqueId)){
-                log.debug("产品:{} 设备:{} 通过关闭，不需要做任务采集");
+                log.warn("产品:{} 设备:{} 通道关闭，不需要做任务采集",taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId());
                 return;
             }
             try {
                 if(!semaphore.get(taskDeviceUniqueId).tryAcquire()){
-                    log.debug("产品:{} 设备:{} 正在执行采集指令，无法获取执行锁");
+                    log.debug("产品:{} 设备:{} 正在执行采集指令，无法获取执行锁",taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId());
                     return;
                 }
                 //采集指令
@@ -199,13 +209,7 @@ public class GinkgoLinkClint {
                 }
                 subDeviceInfos.forEach(subDeviceInfo -> {
                     try {
-                        String collectInstruct = feignAdapterImpl.getCollectInstruct(subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId());
-                        if (StringUtils.isBlank(collectInstruct)) {
-                            log.error("产品:{} 设备:{} collectInstruct:{}为空", taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId(), collectInstruct);
-                            return;
-                        }
-                        DtuDataModel dtuDataMode = getDtuDataModel(taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId(), subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId(), collectInstruct);
-
+                        DtuDataModel dtuDataMode = getDtuDataModel(taskDeviceUniqueId.getProductId(), taskDeviceUniqueId.getDeviceId(), subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId());
                         if (dtuDataMode != null) {
                             pushPackeData(subDeviceInfo.getProductId(), subDeviceInfo.getDeviceId(), GSON.readValue(dtuDataMode.getResult(), Map.class));
                         }

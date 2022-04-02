@@ -13,6 +13,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.zcloud.alone.network.device.feign.client.HubDeviceFeignClient;
+import com.zcloud.alone.network.parser.CommonParser;
 import com.zcloud.ginkgo.core.device.DeviceInfo;
 import com.zcloud.ginkgo.core.device.DeviceUniqueId;
 import com.zcloud.ginkgo.core.device.defaults.DefaultDeviceOperator;
@@ -140,13 +141,23 @@ public class FeignAdapterImpl {
     }
 
     /**
-     * 获取传感器类型
+     * 获取传感器种类
      * @param productId
      * @param deviceId
      * @return
      */
     public String getSensorKind(String productId,String deviceId){
         return MapUtil.getStr(this.getDeviceBizTag(productId, deviceId),"sensorKind");
+    }
+
+    /**
+     * 获取传感器类型
+     * @param productId
+     * @param deviceId
+     * @return
+     */
+    public String getSensorType(String productId,String deviceId){
+        return MapUtil.getStr(this.getDeviceBizTag(productId, deviceId),"sensorType");
     }
 
     /**
@@ -196,7 +207,10 @@ public class FeignAdapterImpl {
      * @return
      */
     public String getCollectInstruct(String productId,String deviceId){
-        return MapUtil.getStr(this.getDeviceBizTag(productId, deviceId),"collectInstruct");
+        String scriptFileName = this.getScriptFileName(productId,deviceId);
+        String sensorAddr = this.getSensorAddr(productId,deviceId);
+        String sensorType = this.getSensorType(productId,deviceId);
+        return CommonParser.generateInstruct(scriptFileName,sensorAddr,sensorType);
     }
 
     /**
