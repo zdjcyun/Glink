@@ -1,92 +1,50 @@
-# Ginkgo Standalone
+### iot网络中间件(v2.4.1)
 
+使用java语言且基于netty, spring boot, redis等开源项目开发来的物联网网络中间件, 支持udp, tcp通讯等底层协议和http, mqtt, modbus(tcp,rtu),plc,dtu(支持心跳，设备注册功能以及AT协议和自定义协议支持),dtu for modbus tcp,dtu for modbus rtu组件适配 等上层协议. 主打工业物联网底层网络交互、设备管理、数据存储、大数据处理. (其中plc包括西门子S7系列，欧姆龙Fins，罗克韦尔CIP，三菱MC). 数据存储将使用taos数据库以及redis消息队列
 
+#### 主要特性
 
-## Getting started
+- 支持服务端启动监听多个端口, 统一所有协议可使用的api接口
+- 包含一套代理客户端通信协议，支持调用：客户端 -> 服务端 -> 设备 -> 服务端 -> 客户端
+- 支持设备协议对象和其业务对象进行分离(支持默认业务处理器【spring单例注入】和自定义业务处理器)
+- 支持同步和异步调用设备, 支持应用程序代理客户端和设备服务端和设备三端之间的同步和异步调用
+- 服务端支持设备上线/下线/异常的事件通知, 支持自定义心跳事件， 客户端支持断线重连
+- 丰富的日志打印功能，包括设备上线，下线提示， 一个协议的生命周期(请求或者请求+响应)等
+- 支持请求时如果连接断线会自动重连(同步等待成功后发送)
+- 支持客户端发送请求时如果客户端不存在将自动创建客户端(同步等待成功后发送)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+#### 已/待开发的协议
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+1. tcp(固定长度解码, 长度字段解码, 换行符解码，自定义分隔符解码，自定义字节到报文解码)[已完成/v2.0.0]
+2. mqtt协议客户端，支持连接标准mqtt broker服务器[已完成/v2.1.0]
+3. 提供modbus支持[已完成/v2.2.0]
+   - 支持modbus tcp、rtu [已完成/v2.4.0]
+   - 支持modbus tcp/rtu for dtu [已完成/v2.4.0]
+   - 支持modbus tcp客户端 [已完成/v2.4.0]
+   - 支持dtu心跳、设备注册、AT指令、以及自定义指令
+4. 新增plc(西门子、欧姆龙)支持(已完成/v2.4.0)
+5. taos数据库适配(已完成/v2.4.0)
+   - 支持单条写入、批量写入
 
-## Add your files
+#### 更新日志(最新 v2.4.1)
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+1. 完成和测试通过modbus tcp客户端协议实现(2021/9/11)
+2. 重新构建modbus tcp client以及新增modbus tcp for dtu功能【v2.4.0+】(2022/4/5)
+3. 重新构建modbus以及新增modbus rtu for dtu功能并新增DTU AT协议和自定义协议支持【v2.4.0+】(2022/4/5)
 
-```
-cd existing_repo
-git remote add origin http://192.168.10.73/iot/ginkgo-standalone.git
-git branch -M main
-git push -uf origin main
-```
+#### 并发测试
 
-## Integrate with your tools
+1. 使用方法：测试包是一个springboot应用，需要安装jdk环境，下载下来后在控制台输入运行命令：`java -jar ***.jar`。 其中iot.num参数用来指定要创建的连接数。此测试应用是用iot-test打包的源码请看iot-test模块
+2. 测试方式：首先会快速创建iot.num指定的连接数量, 然后会定时(3秒)从这些数量的连接中随机取出一台并且发送报文。其中包含有一个获取服务器实时配置数据的连接，用来实时报告测试服务器的运行状态。整个测试服务端会开启两个监听端口(15800, 15811)
+3. 测试环境的配置：2核8G centos8.0 带宽2M
+4. 服务启动前资源详情：可用内存：5634MB  启动后(客户端连接还没创建)：5418MB
 
-- [ ] [Set up project integrations](http://192.168.10.73/iot/ginkgo-standalone/-/settings/integrations)
+#### 模拟工具
 
-## Collaborate with your team
+1. [QtSwissArmyKnife](https://gitee.com/qsaker/QtSwissArmyKnife) 支持udp、tcp、modbus、websocket、串口等调试
+2. [IotClient](https://github.com/zhaopeiym/IoTClient) 支持plc(西门子，欧姆龙，三菱)，modbus，串口，mqtt，tcp, udp等模拟和调试
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+### 使用教程
 
-## Test and Deploy
+首先创建一个springboot应用
 
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!).  Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
