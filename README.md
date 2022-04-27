@@ -1,4 +1,4 @@
-### iot网络中间件(v2.4.1)
+### iot大数据采集中间件(v2.4.1)
 
 使用java语言且基于netty, spring boot, redis等开源项目开发来的物联网网络中间件, 支持udp, tcp通讯等底层协议和http, mqtt, modbus(tcp,rtu),plc,dtu(支持心跳，设备注册功能以及AT协议和自定义协议支持),dtu for modbus tcp,dtu for modbus rtu组件适配 等上层协议. 主打工业物联网底层网络交互、设备管理、数据存储、大数据处理. (其中plc包括西门子S7系列，欧姆龙Fins，罗克韦尔CIP，三菱MC). 数据存储将使用taos数据库以及redis消息队列
 
